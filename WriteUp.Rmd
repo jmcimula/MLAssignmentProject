@@ -1,0 +1,112 @@
+---
+title: "Machine Learning Prediction Assignment Writeup"
+author: "JHU Data Science"
+date: "By Jean Marie Cimula"
+output: html_document
+---
+
+##Background
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+##Data
+
+The training data for this project are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. If you use the document you create for this class for any purpose please cite them as they have been very generous in allowing their data to be used for this kind of assignment.
+
+
+##Exploratory Data Analysis
+
+```{r results='hide', message=FALSE, warning=FALSE}
+#Loading libraries
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(randomForest)
+```
+
+```{r}
+#Loading the training data set
+TRAINING <- read.csv("pml-training.csv", na.strings=c("NA","#DIV/0!", ""))
+#Loading the testing data set
+TESTING <- read.csv("pml-testing.csv", na.strings=c("NA","#DIV/0!", ""))
+
+#Deleting missing values in training and testing data set
+TRAINING <- TRAINING[,colSums(is.na(TRAINING)) == 0]
+TESTING  <- TESTING[,colSums(is.na(TESTING)) == 0]
+
+#Count per class
+table(TRAINING$classe)
+
+#Partitioning the training set
+TR    <- createDataPartition(TRAINING$classe,p=.9,list=FALSE)
+TRset <- TRAINING [TR,]
+TRVal <- TRAINING [-TR,]
+
+#Removing of non-numeric variables and near-zero values
+TRset <- TRset [,-(1:7)]
+zero  <- ncol (TRset)
+TRset [,-zero] <- data.frame (sapply(TRset[,-zero],as.numeric))
+zd <- nearZeroVar(TRset[,-zero],saveMetrics=TRUE)
+TRset <- TRset [,!as.logical(zd$nzv)]
+
+#Count per class with non-numeric variables and near-zero values
+table(TRset$classe)
+
+#Prediction with Regression model
+
+#First prediction model based on RPART method
+mdOne  <- rpart (classe ~., data=TRset, method="class")
+prdOne <- predict (mdOne,TRVal,type="class")
+
+#Plot to present the classication tree
+rpart.plot(mdOne, main="Classification", extra=102, under=TRUE, faclen=0)
+
+#Confusion Matrix
+print(confusionMatrix(prdOne,TRVal$classe))
+
+#Second prediction model based on Random Forest method
+mdTwo <- randomForest(classe ~. , data=TRset, method="class")
+
+#Plot 1 for Random Forest
+varImpPlot(mdTwo)
+
+#Plot 2 for Random Forest
+plot(mdTwo,log="y")
+
+#Confusion Matrix
+print(confusionMatrix(predict(mdTwo,TRset),TRset$classe))
+
+#As we can see the accuracy with Random Forest is very higher and significative.
+
+#Let's use the Random Forest algorithm for the final classification
+
+#Final Test Set Classification
+lastPred <- predict(mdTwo,TESTING,type="class")
+print(lastPred)
+
+
+#Submission WriteUp Project
+# Write files for submission
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file = filename, quote = FALSE,row.names = FALSE, col.names = FALSE)
+  }
+}
+
+pml_write_files(lastPred)
+
+#End
+```
+
+
+
